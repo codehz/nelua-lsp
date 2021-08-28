@@ -22,7 +22,7 @@ local sstream = require 'nelua.utils.sstream'
 local analyzer = require 'nelua.analyzer'
 local console  = require 'nelua.utils.console'
 local utils = require 'utils'
-local syntax = require 'nelua.syntaxdefs'()
+local syntax = require 'nelua.syntaxdefs'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
 

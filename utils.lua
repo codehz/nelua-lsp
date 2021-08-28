@@ -1,5 +1,5 @@
 local fs = require 'nelua.utils.fs'
-local relabel = require 'relabel'
+local lpegrex = require 'nelua.thirdparty.lpegrex'
 
 local utils = {}
 
@@ -29,7 +29,7 @@ end
 
 -- Convert content position into a table to send back in LSP API.
 function utils.pos2textpos(content, pos)
-  local lineno, colno = relabel.calcline(content, pos)
+  local lineno, colno = lpegrex.calcline(content, pos)
   return {line=lineno-1, character=colno-1} -- convert to zero-based
 end
 
