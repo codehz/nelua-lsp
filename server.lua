@@ -1,5 +1,9 @@
 local json = require 'json'
-local console  = require 'nelua.utils.console'
+local console = require 'nelua.utils.console'
+local utils = require 'utils'
+
+-- Workaround for text mode stdio
+local lenfmt = utils.is_windows and 'Content-Length: %d\n\n' or 'Content-Length: %d\r\n\r\n'
 
 local server = {
   -- List of callbacks for each method.
@@ -23,10 +27,11 @@ local LSPErrorsCodes = {
 
 -- Send a JSON response.
 function server.send_response(id, result, error)
-  local ans = {id=id, result=result, error=error}
+  local ans = {jsonrpc="2.0", id=id, result=result, error=error}
   local content = json.encode(ans)
-  local header = string.format('Content-Length: %d\r\n\r\n', #content)
-  server.stdout:write(header..content)
+  local header = string.format(lenfmt, #content)
+  server.stdout:write(header)
+  server.stdout:write(content)
   server.stdout:flush()
 end
 
@@ -39,6 +44,30 @@ function server.send_error(id, code, message)
   end
   message = message or 'Error: '..tostring(code)
   server.send_response(id, nil, {code=code, message=message})
+end
+
+-- Send an notification
+function server.send_notification(method, params)
+  local ans = {jsonrpc="2.0", method=method, params=params}
+  local content = json.encode(ans)
+  local header = string.format(lenfmt, #content)
+  server.stdout:write(header)
+  server.stdout:write(content)
+  server.stdout:flush()
+end
+
+-- Show message
+function server.error(message)
+  server.send_notification("window/showMessage", {type=1, message=message})
+end
+function server.warn(message)
+  server.send_notification("window/showMessage", {type=2, message=message})
+end
+function server.info(message)
+  server.send_notification("window/showMessage", {type=3, message=message})
+end
+function server.log(message)
+  server.send_notification("window/showMessage", {type=4, message=message})
 end
 
 -- Wait and read next JSON request, returning it as a table.
@@ -73,7 +102,7 @@ function server.listen(stdin, stdout)
     console.debug('LSP - '..req.method)
     if req.method == 'initialize' then
       -- send back the supported capabilities
-      server.send_response(req.id, {capabilities=server.capabilities})
+      server.send_response(req.id, {capabilities=server.capabilities, serverInfo={name="Nelua LSP Server"}})
     elseif req.method == 'initialized' then
       -- both client and server agree on initialization
       initialized = true

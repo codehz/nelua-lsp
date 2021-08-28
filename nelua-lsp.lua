@@ -1,3 +1,5 @@
+local utils = require 'utils'
+
 local stdout
 do
   -- Add current script path to the lua package search path,
@@ -9,10 +11,9 @@ do
   package.path = script_dir..dirsep..'?.lua'..pathsep..package.path
 
   -- Redirect stderr/stdout to a file so we can debug errors.
-  local out = io.open(script_dir..dirsep..'stderr.log', 'a')
-  assert(out, 'failed to redirect stdout/stderr!')
+  local err = io.stderr
   stdout = io.stdout
-  _G.io.stdout, _G.io.stderr = out, out
+  _G.io.stdout, _G.io.stderr = err, err
 end
 
 -- Required modules
@@ -21,17 +22,15 @@ local fs = require 'nelua.utils.fs'
 local sstream = require 'nelua.utils.sstream'
 local analyzer = require 'nelua.analyzer'
 local console  = require 'nelua.utils.console'
-local utils = require 'utils'
-local syntax = require 'nelua.syntaxdefs'
+local aster = require 'nelua.aster'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
 
 local function analyze_ast(filepath)
   local ast
   local ok, err = except.trycall(function()
-    local parser = syntax.parser
-    ast = parser:parse(fs.ereadfile(filepath), filepath)
-    local context = AnalyzerContext(analyzer.visitors, parser, ast, 'c')
+    ast = aster.parse(fs.ereadfile(filepath), filepath)
+    local context = AnalyzerContext(analyzer.visitors, ast, 'c')
     analyzer.analyze(context)
   end)
   if not ok then

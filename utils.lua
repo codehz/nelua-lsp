@@ -3,9 +3,20 @@ local lpegrex = require 'nelua.thirdparty.lpegrex'
 
 local utils = {}
 
+utils.dirsep, utils.pathsep = package.config:match('(.)[\r\n]+(.)[\r\n]+')
+utils.is_windows = utils.dirsep == '\\'
+
+function decodeURI(s)
+  return string.gsub(s, '%%(%x%x)', function(h) return string.char(tonumber(h, 16)) end)
+end
+
 -- Convert a LSP uri to an usable system path.
 function utils.uri2path(uri)
   local file = uri:match('file://(.*)')
+  file = decodeURI(file)
+  if utils.is_windows then
+    file = string.sub(string.gsub(file, '/', '\\'), 2)
+  end
   file = fs.normpath(file)
   return file
 end
