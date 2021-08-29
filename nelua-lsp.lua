@@ -47,18 +47,19 @@ local function analyze_ast(input, infile)
   return ast
 end
 
-local function cache_document(filepath, content)
+local function cache_document(uri, content)
+  local filepath = utils.uri2path(uri)
   local content = content or fs.readfile(filepath)
   ast = analyze_ast(content, filepath)
   if ast then
     local ret = {content = content, ast = ast}
-    cache[filepath] = ret
+    cache[uri] = ret
     return ret
   end
 end
 
-local function analyze_and_find_loc(filepath, textpos)
-  local cached = cache[filepath] or cache_document(filepath)
+local function analyze_and_find_loc(uri, textpos)
+  local cached = cache[uri] or cache_document(uri)
   if not cached then return end
   local content = cached.content
   local pos = utils.linecol2pos(content, textpos.line, textpos.character)
@@ -126,7 +127,7 @@ end
 
 -- Get hover information
 local function hover_method(reqid, params)
-  local loc = analyze_and_find_loc(utils.uri2path(params.textDocument.uri), params.position)
+  local loc = analyze_and_find_loc(params.textDocument.uri, params.position)
   if loc then
     local value = markup_loc_info(loc)
     server.send_response(reqid, {contents = {kind = 'markdown', value = value}})
@@ -137,24 +138,20 @@ end
 
 local function sync_open(reqid, params)
   local doc = params.textDocument
-  local filepath = utils.uri2path(doc.uri)
-  local content = doc.text
-  if not cache_document(filepath, content) then
+  if not cache_document(doc.uri, doc.text) then
     server.error('Failed to load document')
   end
 end
 
 local function sync_change(reqid, params)
   local doc = params.textDocument
-  local filepath = utils.uri2path(doc.uri)
   local content = params.contentChanges[1].text
-  cache_document(filepath, content)
+  cache_document(doc.uri, content)
 end
 
 local function sync_close(reqid, params)
   local doc = params.textDocument
-  local filepath = utils.uri2path(doc.uri)
-  cache[filepath] = nil
+  cache[doc.uri] = nil
 end
 
 -- All capabilities supported by this language server.
