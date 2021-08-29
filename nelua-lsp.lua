@@ -29,7 +29,8 @@ local json = require 'json'
 local inspect = require 'nelua.thirdparty.inspect'
 local parseerror = require 'parseerror'
 
-local cache = {}
+local astcache = {}
+local codecache = {}
 
 local function map_severity(text)
   if text == 'error' or text == 'syntax error' then return 1 end
@@ -38,7 +39,7 @@ local function map_severity(text)
   return 4
 end
 
-local function analyze_ast(input, infile, uri)
+local function analyze_ast(input, infile, uri, skip)
   local ast
   local ok, err = except.trycall(function()
     ast = aster.parse(input, infile)
@@ -66,34 +67,37 @@ local function analyze_ast(input, infile, uri)
           message = ins.message,
         })
       end
-    else
+    elseif not skip then
       server.error(tostring(err))
     end
   end
-  server.send_notification('textDocument/publishDiagnostics', {
-    uri = uri,
-    diagnostics = diagnostics,
-  })
+  if not skip then
+    server.send_notification('textDocument/publishDiagnostics', {
+      uri = uri,
+      diagnostics = diagnostics,
+    })
+  end
   return ast
 end
 
-local function cache_document(uri, content)
+local function fetch_document(uri, content, skip)
   local filepath = utils.uri2path(uri)
   local content = content or fs.readfile(filepath)
-  ast = analyze_ast(content, filepath, uri)
-  if ast then
-    local ret = {content = content, ast = ast}
-    cache[uri] = ret
-    return ret
+  ast = analyze_ast(content, filepath, uri, skip)
+  if not skip then
+    codecache[uri] = content
+    if ast then
+      astcache[uri] = ast
+    end
   end
+  return ast
 end
 
-local function analyze_and_find_loc(uri, textpos)
-  local cached = cache[uri] or cache_document(uri)
-  if not cached then return end
-  local content = cached.content
+local function analyze_and_find_loc(uri, textpos, content)
+  local ast = content and fetch_document(uri, content, true) or astcache[uri] or fetch_document(uri)
+  if not ast then return end
+  local content = content or codecache[uri]
   local pos = utils.linecol2pos(content, textpos.line, textpos.character)
-  local ast = cached.ast
   if not ast then return end
   local nodes = utils.find_nodes_by_pos(ast, pos)
   local lastnode = nodes[#nodes]
@@ -103,9 +107,10 @@ local function analyze_and_find_loc(uri, textpos)
     loc.symbol = lastnode.attr
   end
   for i=#nodes,1,-1 do -- find scope
-    local attr = nodes[i].attr
-    if attr.scope then
-      loc.scope = attr.scope
+    local node = nodes[i]
+    -- utils.dump_table(nodes[i])
+    if node.scope then
+      loc.scope = node.scope
       break
     end
   end
@@ -169,7 +174,7 @@ end
 
 local function sync_open(reqid, params)
   local doc = params.textDocument
-  if not cache_document(doc.uri, doc.text) then
+  if not fetch_document(doc.uri, doc.text) then
     server.error('Failed to load document')
   end
 end
@@ -177,12 +182,40 @@ end
 local function sync_change(reqid, params)
   local doc = params.textDocument
   local content = params.contentChanges[1].text
-  cache_document(doc.uri, content)
+  fetch_document(doc.uri, content)
 end
 
 local function sync_close(reqid, params)
   local doc = params.textDocument
-  cache[doc.uri] = nil
+  astcache[doc.uri] = nil
+  codecache[doc.uri] = nil
+end
+
+local function gen_completion_list(scope, out)
+  if not scope then return end
+  gen_completion_list(scope.parent, out)
+  for _, v in ipairs(scope.symbols) do
+    out[v.name] = tostring(v.type)
+  end
+end
+
+local function code_completion(reqid, params)
+  local uri = params.textDocument.uri
+  local content = codecache[uri]
+  local textpos = params.position
+  local pos = utils.linecol2pos(content, textpos.line, textpos.character)
+  content = content:sub(1, pos-1):gsub('%a%w*$', '')..'--[[]]'..content:sub(pos):gsub('^%a%w*', '')
+
+  local ast = analyze_and_find_loc(params.textDocument.uri, textpos, content)
+  local list = {}
+  if ast then
+    local symcache = {}
+    gen_completion_list(ast.scope, symcache)
+    for k, v in pairs(symcache) do
+      table.insert(list, {label = k, detail = v})
+    end
+  end
+  server.send_response(reqid, list)
 end
 
 -- All capabilities supported by this language server.
@@ -193,12 +226,16 @@ server.capabilities = {
   },
   hoverProvider = true,
   publishDiagnostics = true,
+  completionProvider = {
+    triggerCharacters = { "." },
+  }
 }
 server.methods = {
   ['textDocument/hover'] = hover_method,
   ['textDocument/didOpen'] = sync_open,
   ['textDocument/didChange'] = sync_change,
   ['textDocument/didClose'] = sync_close,
+  ['textDocument/completion'] = code_completion,
 }
 
 -- Listen for requests.

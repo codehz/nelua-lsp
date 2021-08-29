@@ -124,7 +124,6 @@ function server.listen(stdin, stdout)
         if not ok then
           local errmsg = 'error while handling method:\n'..tostring(err)
           server.send_error(req.id, 'InternalError', errmsg)
-          console.debug(errmsg)
         end
       else
         console.debug('error: unsupported method "'.. tostring(method)..'"')
