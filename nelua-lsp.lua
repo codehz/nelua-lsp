@@ -26,11 +26,13 @@ local aster = require 'nelua.aster'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
 local generator = require('nelua.cgenerator')
+local json = require 'json'
 
-local function analyze_ast(infile)
+local cache = {}
+
+local function analyze_ast(input, infile)
   local ast
   local ok, err = except.trycall(function()
-    local input = fs.ereadfile(infile)
     ast = aster.parse(input, infile)
     local context = AnalyzerContext(analyzer.visitors, ast, generator)
     except.try(function()
@@ -45,10 +47,22 @@ local function analyze_ast(infile)
   return ast
 end
 
+local function cache_document(filepath, content)
+  local content = content or fs.readfile(filepath)
+  ast = analyze_ast(content, filepath)
+  if ast then
+    local ret = {content = content, ast = ast}
+    cache[filepath] = ret
+    return ret
+  end
+end
+
 local function analyze_and_find_loc(filepath, textpos)
-  local content = fs.readfile(filepath)
+  local cached = cache[filepath] or cache_document(filepath)
+  if not cached then return end
+  local content = cached.content
   local pos = utils.linecol2pos(content, textpos.line, textpos.character)
-  local ast = analyze_ast(filepath)
+  local ast = cached.ast
   if not ast then return end
   local nodes = utils.find_nodes_by_pos(ast, pos)
   local lastnode = nodes[#nodes]
@@ -121,12 +135,42 @@ local function hover_method(reqid, params)
   end
 end
 
+local function sync_open(reqid, params)
+  local doc = params.textDocument
+  local filepath = utils.uri2path(doc.uri)
+  local content = doc.text
+  if not cache_document(filepath, content) then
+    server.error('Failed to load document')
+  end
+end
+
+local function sync_change(reqid, params)
+  local doc = params.textDocument
+  local filepath = utils.uri2path(doc.uri)
+  local content = params.contentChanges[1].text
+  cache_document(filepath, content)
+end
+
+local function sync_close(reqid, params)
+  local doc = params.textDocument
+  local filepath = utils.uri2path(doc.uri)
+  cache[filepath] = nil
+end
+
 -- All capabilities supported by this language server.
-server.capabilities ={
-  hoverProvider= true,
+server.capabilities = {
+  textDocumentSync = {
+    openClose = true,
+    change = 1,
+  },
+  hoverProvider = true,
+  publishDiagnostics = true,
 }
 server.methods = {
   ['textDocument/hover'] = hover_method,
+  ['textDocument/didOpen'] = sync_open,
+  ['textDocument/didChange'] = sync_change,
+  ['textDocument/didClose'] = sync_close,
 }
 
 -- Listen for requests.
