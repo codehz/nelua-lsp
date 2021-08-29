@@ -1,5 +1,6 @@
 local utils = require 'utils'
 local lfs = require 'lfs'
+local console  = require 'nelua.utils.console'
 
 local stdout
 do
@@ -11,6 +12,8 @@ do
   local err = io.stderr
   stdout = io.stdout
   _G.io.stdout, _G.io.stderr = err, err
+  _G.print = console.debug
+  _G.printf = console.debugf
 end
 
 -- Required modules
@@ -18,7 +21,6 @@ local except = require 'nelua.utils.except'
 local fs = require 'nelua.utils.fs'
 local sstream = require 'nelua.utils.sstream'
 local analyzer = require 'nelua.analyzer'
-local console  = require 'nelua.utils.console'
 local aster = require 'nelua.aster'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
@@ -42,6 +44,8 @@ local function analyze_ast(input, infile, uri)
     ast = aster.parse(input, infile)
     local context = AnalyzerContext(analyzer.visitors, ast, generator)
     except.try(function()
+      local dir = infile:match('(.+)'..utils.dirsep)
+      lfs.chdir(dir)
       context = analyzer.analyze(context)
     end, function(e)
       -- todo
@@ -49,17 +53,21 @@ local function analyze_ast(input, infile, uri)
   end)
   local diagnostics = {}
   if not ok then
-    local stru = parseerror(err.message)
-    for _, ins in ipairs(stru) do
-      table.insert(diagnostics, {
-        range = {
-          ['start'] = {line = ins.line - 1, character = ins.character - 1},
-          ['end'] = {line = ins.line - 1, character = ins.character + ins.length - 1},
-        },
-        severity = map_severity(ins.severity),
-        source = 'Nelua LSP',
-        message = ins.message,
-      })
+    if err.message then
+      local stru = parseerror(err.message)
+      for _, ins in ipairs(stru) do
+        table.insert(diagnostics, {
+          range = {
+            ['start'] = {line = ins.line - 1, character = ins.character - 1},
+            ['end'] = {line = ins.line - 1, character = ins.character + ins.length - 1},
+          },
+          severity = map_severity(ins.severity),
+          source = 'Nelua LSP',
+          message = ins.message,
+        })
+      end
+    else
+      server.error(tostring(err))
     end
   end
   server.send_notification('textDocument/publishDiagnostics', {
