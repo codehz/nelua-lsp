@@ -27,10 +27,19 @@ local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
 local generator = require('nelua.cgenerator')
 local json = require 'json'
+local inspect = require 'nelua.thirdparty.inspect'
+local parseerror = require 'parseerror'
 
 local cache = {}
 
-local function analyze_ast(input, infile)
+local function map_severity(text)
+  if text == 'error' then return 1 end
+  if text == 'warning' then return 2 end
+  if text == 'info' then return 3 end
+  return 4
+end
+
+local function analyze_ast(input, infile, uri)
   local ast
   local ok, err = except.trycall(function()
     ast = aster.parse(input, infile)
@@ -38,19 +47,35 @@ local function analyze_ast(input, infile)
     except.try(function()
       context = analyzer.analyze(context)
     end, function(e)
-      console.debug(context:get_visiting_traceback(1) .. e:get_message())
+      -- todo
     end)
   end)
+  local diagnostics = {}
   if not ok then
-    console.debug(err)
+    local stru = parseerror(err.message)
+    for _, ins in ipairs(stru) do
+      table.insert(diagnostics, {
+        range = {
+          ['start'] = {line = ins.line - 1, character = ins.character - 1},
+          ['end'] = {line = ins.line - 1, character = ins.character + ins.length - 1},
+        },
+        severity = map_severity(ins.severity),
+        source = 'Nelua LSP',
+        message = ins.message,
+      })
+    end
   end
+  server.send_notification('textDocument/publishDiagnostics', {
+    uri = uri,
+    diagnostics = diagnostics,
+  })
   return ast
 end
 
 local function cache_document(uri, content)
   local filepath = utils.uri2path(uri)
   local content = content or fs.readfile(filepath)
-  ast = analyze_ast(content, filepath)
+  ast = analyze_ast(content, filepath, uri)
   if ast then
     local ret = {content = content, ast = ast}
     cache[uri] = ret
