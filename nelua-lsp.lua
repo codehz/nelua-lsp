@@ -86,16 +86,23 @@ local function markup_loc_info(loc)
       end
       ss:add('```')
     elseif type.is_function then
-      type = attr.value
-      ss:addmany('**function** `', type.nickname or type.name, '`\n')
-      local content = utils.get_node_src_content(type.node)
-      ss:add('```nelua\n')
-      if type.type then
-        ss:addmany(type.type,'\n')
+      if attr.value then
+        type = attr.value
+        ss:addmany('**function** `', type.nickname or type.name, '`\n')
+        local content = utils.get_node_src_content(type.node)
+        ss:add('```nelua\n')
+        if type.type then
+          ss:addmany(type.type,'\n')
+        else
+          ss:addmany(type.symbol,'\n')
+        end
+        ss:add('```')
       else
-        ss:addmany(type.symbol,'\n')
+        ss:addmany('**function** `', attr.name, '`\n')
+        if attr.builtin then
+          ss:add('* builtin function\n')
+        end
       end
-      ss:add('```')
     else
       ss:addmany('**value** `', typename, '`')
     end
