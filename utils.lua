@@ -1,5 +1,6 @@
 local fs = require 'nelua.utils.fs'
 local lpegrex = require 'nelua.thirdparty.lpegrex'
+local console  = require 'nelua.utils.console'
 
 local utils = {}
 
@@ -75,6 +76,12 @@ function utils.get_node_src_content(node)
   local text = node.src.content:sub(node.pos, node.endpos-1)
   text = text:gsub('%-%-.*',''):gsub('%s+$','')
   return text
+end
+
+function utils.dump_table(table)
+  for k, v in pairs(table) do
+    console.debugf("%s = %s", k, tostring(v))
+  end
 end
 
 return utils

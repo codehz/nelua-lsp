@@ -25,13 +25,19 @@ local console  = require 'nelua.utils.console'
 local aster = require 'nelua.aster'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local server = require 'server'
+local generator = require('nelua.cgenerator')
 
-local function analyze_ast(filepath)
+local function analyze_ast(infile)
   local ast
   local ok, err = except.trycall(function()
-    ast = aster.parse(fs.ereadfile(filepath), filepath)
-    local context = AnalyzerContext(analyzer.visitors, ast, 'c')
-    analyzer.analyze(context)
+    local input = fs.ereadfile(infile)
+    ast = aster.parse(input, infile)
+    local context = AnalyzerContext(analyzer.visitors, ast, generator)
+    except.try(function()
+      context = analyzer.analyze(context)
+    end, function(e)
+      console.debug(context:get_visiting_traceback(1) .. e:get_message())
+    end)
   end)
   if not ok then
     console.debug(err)
@@ -65,16 +71,17 @@ local function markup_loc_info(loc)
   local ss = sstream()
   local attr = loc.node.attr
   local type = attr.type
+
   if type then
     if type.is_type then
       type = attr.value
-      ss:add('**type** `', type.nickname or type.name, '`\n')
+      ss:addmany('**type** `', type.nickname or type.name, '`\n')
       local content = utils.get_node_src_content(type.node)
       ss:add('```nelua\n')
       if content then
-        ss:add('', content,'\n')
+        ss:addmany('', content,'\n')
       else
-        ss:add('', type:typedesc(),'\n')
+        ss:addmany('', type:typedesc(),'\n')
       end
       ss:add('```')
     end
@@ -86,7 +93,8 @@ end
 local function hover_method(reqid, params)
   local loc = analyze_and_find_loc(utils.uri2path(params.textDocument.uri), params.position)
   if loc then
-    server.send_response(reqid, {contents = markup_loc_info(loc)})
+    local value = markup_loc_info(loc)
+    server.send_response(reqid, {contents = {kind = 'markdown', value = value}})
   else
     server.send_response(reqid, {contents = ''})
   end
