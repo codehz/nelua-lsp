@@ -4,8 +4,7 @@ local console = require 'nelua.utils.console'
 local inspect = require 'nelua.thirdparty.inspect'
 local utils = require 'utils'
 
--- Workaround for text mode stdio
-local lenfmt = utils.is_windows and 'Content-Length: %d\n\n' or 'Content-Length: %d\r\n\r\n'
+local lenfmt = 'Content-Length: %d\r\n\r\n'
 
 local server = {
   -- List of callbacks for each method.

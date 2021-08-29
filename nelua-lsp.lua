@@ -1,15 +1,12 @@
 local utils = require 'utils'
+local lfs = require 'lfs'
 
 local stdout
 do
-  -- Add current script path to the lua package search path,
-  -- this is necessary to require modules relative to this file.
-  local script_path = debug.getinfo(1, 'S').source:sub(2)
-  local script_dir = script_path:gsub('[/\\]*[^/\\]-$', '')
-  script_dir = script_dir == '' and '.' or script_dir
-  local dirsep, pathsep = package.config:match('(.)[\r\n]+(.)[\r\n]+')
-  package.path = script_dir..dirsep..'?.lua'..pathsep..package.path
-
+  -- Fix CRLF problem on windows
+  lfs.setmode(io.stdin, 'binary')
+  lfs.setmode(io.stdout, 'binary')
+  lfs.setmode(io.stderr, 'binary')
   -- Redirect stderr/stdout to a file so we can debug errors.
   local err = io.stderr
   stdout = io.stdout
