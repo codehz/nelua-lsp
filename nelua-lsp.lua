@@ -30,7 +30,7 @@ local parseerror = require 'parseerror'
 local cache = {}
 
 local function map_severity(text)
-  if text == 'error' then return 1 end
+  if text == 'error' or text == 'syntax error' then return 1 end
   if text == 'warning' then return 2 end
   if text == 'info' then return 3 end
   return 4
