@@ -70,14 +70,6 @@ function utils.find_nodes_by_pos(node, pos)
   return foundnodes
 end
 
--- Get source code for the node.
-function utils.get_node_src_content(node)
-  if not node or not node.src or not node.pos or not node.endpos then return end
-  local text = node.src.content:sub(node.pos, node.endpos-1)
-  text = text:gsub('%-%-.*',''):gsub('%s+$','')
-  return text
-end
-
 function utils.dump_table(table)
   if not table then
     console.debug '(nil)'

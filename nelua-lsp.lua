@@ -122,19 +122,11 @@ local function node_info(node, attr)
     if type.is_type then
       type = attr.value
       ss:addmany('**type** `', type.nickname or type.name, '`\n')
-      local content = utils.get_node_src_content(type.node)
-      ss:add('```nelua\n')
-      if content then
-        ss:addmany('', content,'\n')
-      else
-        ss:addmany('', type:typedesc(),'\n')
-      end
-      ss:add('```')
+      ss:addmany('```nelua\n', type:typedesc(),'\n```')
     elseif type.is_function or type.is_polyfunction then
       if attr.value then
         type = attr.value
         ss:addmany('**', typename, '** `', type.nickname or type.name, '`\n')
-        local content = utils.get_node_src_content(type.node)
         ss:add('```nelua\n')
         if type.type then
           ss:addmany(type.type,'\n')
