@@ -1,5 +1,7 @@
+local lfs = require 'lfs'
 local json = require 'json'
 local console = require 'nelua.utils.console'
+local inspect = require 'nelua.thirdparty.inspect'
 local utils = require 'utils'
 
 -- Workaround for text mode stdio
@@ -102,6 +104,9 @@ function server.listen(stdin, stdout)
     console.debug('LSP - '..req.method)
     if req.method == 'initialize' then
       -- send back the supported capabilities
+      if req.params.rootPath then
+        lfs.chdir(req.params.rootPath)
+      end
       server.send_response(req.id, {capabilities=server.capabilities, serverInfo={name="Nelua LSP Server"}})
     elseif req.method == 'initialized' then
       -- both client and server agree on initialization
