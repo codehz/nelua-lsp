@@ -130,10 +130,10 @@ local function markup_loc_info(loc)
         ss:addmany('', type:typedesc(),'\n')
       end
       ss:add('```')
-    elseif type.is_function then
+    elseif type.is_function or type.is_polyfunction then
       if attr.value then
         type = attr.value
-        ss:addmany('**function** `', type.nickname or type.name, '`\n')
+        ss:addmany('**', typename, '** `', type.nickname or type.name, '`\n')
         local content = utils.get_node_src_content(type.node)
         ss:add('```nelua\n')
         if type.type then
