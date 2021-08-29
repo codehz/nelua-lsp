@@ -32,7 +32,10 @@ return function(content)
     else
       local matched = line:match("^ *([~^]+) *$")
       if matched then
+        curr.message = curr.message:match('(.+)\n')
         curr.length = #matched
+      else
+        curr.message = curr.message..'\n'..line
       end
     end
   end
