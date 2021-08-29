@@ -79,6 +79,10 @@ function utils.get_node_src_content(node)
 end
 
 function utils.dump_table(table)
+  if not table then
+    console.debug '(nil)'
+    return
+  end
   for k, v in pairs(table) do
     console.debugf("%s = %s", k, tostring(v))
   end

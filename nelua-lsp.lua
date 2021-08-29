@@ -151,7 +151,7 @@ local function node_info(node, attr)
     elseif attr.ismethod then
       return node_info(nil, attr.calleesym)
     else
-      ss:addmany('**value** `', typename, '`')
+      ss:addmany('**value** `', type, '`\n')
     end
   end
   return ss:tostring()
