@@ -112,9 +112,9 @@ local function analyze_and_find_loc(uri, textpos)
   return loc
 end
 
-local function markup_loc_info(loc)
+local function node_info(node, attr)
   local ss = sstream()
-  local attr = loc.node.attr
+  local attr = attr or node.attr
   local type = attr.type
 
   if type then
@@ -148,6 +148,8 @@ local function markup_loc_info(loc)
           ss:add('* builtin function\n')
         end
       end
+    elseif attr.ismethod then
+      return node_info(nil, attr.calleesym)
     else
       ss:addmany('**value** `', typename, '`')
     end
@@ -159,7 +161,7 @@ end
 local function hover_method(reqid, params)
   local loc = analyze_and_find_loc(params.textDocument.uri, params.position)
   if loc then
-    local value = markup_loc_info(loc)
+    local value = node_info(loc.node)
     server.send_response(reqid, {contents = {kind = 'markdown', value = value}})
   else
     server.send_response(reqid, {contents = ''})
