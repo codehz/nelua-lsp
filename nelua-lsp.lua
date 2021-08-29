@@ -112,6 +112,11 @@ local function analyze_and_find_loc(uri, textpos)
   return loc
 end
 
+local function dump_type_info(type, ss)
+  ss:addmany('**type** `', type.nickname or type.name, '`\n')
+  ss:addmany('```nelua\n', type:typedesc(),'\n```')
+end
+
 local function node_info(node, attr)
   local ss = sstream()
   local attr = attr or node.attr
@@ -121,8 +126,7 @@ local function node_info(node, attr)
     local typename = type.name
     if type.is_type then
       type = attr.value
-      ss:addmany('**type** `', type.nickname or type.name, '`\n')
-      ss:addmany('```nelua\n', type:typedesc(),'\n```')
+      dump_type_info(type, ss)
     elseif type.is_function or type.is_polyfunction then
       if attr.value then
         type = attr.value
@@ -140,6 +144,9 @@ local function node_info(node, attr)
           ss:add('* builtin function\n')
         end
       end
+    elseif type.is_pointer then
+      ss:add('**pointer**\n')
+      dump_type_info(type.subtype, ss)
     elseif attr.ismethod then
       return node_info(nil, attr.calleesym)
     else
