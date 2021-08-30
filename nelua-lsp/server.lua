@@ -106,8 +106,12 @@ function server.listen(stdin, stdout)
     if req.method == 'initialize' then
       -- send back the supported capabilities
       if req.params.rootPath then
-        lfs.chdir(req.params.rootPath)
         server.root_path = req.params.rootPath
+      elseif req.params.rootUri then
+        server.root_path = utils.uri2path(req.params.rootUri)
+      end
+      if server.root_path then
+        lfs.chdir(server.root_path)
       end
       server.send_response(req.id, {capabilities=server.capabilities, serverInfo={name="Nelua LSP Server"}})
     elseif req.method == 'initialized' then
