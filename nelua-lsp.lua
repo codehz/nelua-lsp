@@ -125,12 +125,15 @@ local function analyze_and_find_loc(uri, textpos, content)
   return loc
 end
 
-local function dump_type_info(type, ss)
-  ss:addmany('**type** `', type.nickname or type.name, '`\n')
+local function dump_type_info(type, ss, opts)
+  if not opts.no_header then
+    ss:addmany('**type** `', type.nickname or type.name, '`\n')
+  end
   ss:addmany('```nelua\n', type:typedesc(),'\n```')
 end
 
-local function node_info(node, attr)
+local function node_info(node, attr, opts)
+  local opts = opts or {}
   local ss = sstream()
   local attr = attr or node.attr
   local type = attr.type
@@ -139,11 +142,13 @@ local function node_info(node, attr)
     local typename = type.name
     if type.is_type then
       type = attr.value
-      dump_type_info(type, ss)
+      dump_type_info(type, ss, opts)
     elseif type.is_function or type.is_polyfunction then
       if attr.value then
         type = attr.value
-        ss:addmany('**', typename, '** `', type.nickname or type.name, '`\n')
+        if not opts.no_header then
+          ss:addmany('**', typename, '** `', type.nickname or type.name, '`\n')
+        end
         ss:add('```nelua\n')
         if type.type then
           ss:addmany(type.type,'\n')
@@ -152,7 +157,9 @@ local function node_info(node, attr)
         end
         ss:add('```')
       else
-        ss:addmany('**function** `', attr.name, '`\n')
+        if not opts.no_header then
+          ss:addmany('**function** `', attr.name, '`\n')
+        end
         if attr.builtin then
           ss:add('* builtin function\n')
         end
@@ -161,9 +168,12 @@ local function node_info(node, attr)
       ss:add('**pointer**\n')
       dump_type_info(type.subtype, ss)
     elseif attr.ismethod then
-      return node_info(nil, attr.calleesym)
+      return node_info(nil, attr.calleesym, opts)
     else
       ss:addmany('**value** `', type, '`\n')
+      if type.symbol and type.symbol.node and type.symbol.node.attr then
+        ss:addmany('\n', node_info(nil, type.symbol.node.attr, {no_header = true}))
+      end
     end
   end
   return ss:tostring()
