@@ -217,7 +217,7 @@ local function code_completion(reqid, params)
     before = before:sub(1, -2)..'()'
     kind = "meta"
   end
-  content = before..' '..after
+  content = before..'--[[]]'..after
 
   local ast = analyze_and_find_loc(params.textDocument.uri, textpos, content)
   local list = {}
@@ -246,8 +246,13 @@ local function code_completion(reqid, params)
               end
             end
           elseif kind == "field" then
-            for k, v in pairs(xtype.metafields) do
-              table.insert(list, {label = k, detail = tostring(v)})
+            local tab = xtype.is_record and xtype.metafields or xtype.fields
+            for k, v in spairs(tab) do
+              if xtype.is_enum then
+                table.insert(list, {label = k, detail = tostring(xtype)})
+              else
+                table.insert(list, {label = k, detail = tostring(v.type and v.type or v)})
+              end
             end
           end
         end
