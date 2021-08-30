@@ -23,10 +23,11 @@ local sstream = require 'nelua.utils.sstream'
 local analyzer = require 'nelua.analyzer'
 local aster = require 'nelua.aster'
 local AnalyzerContext = require 'nelua.analyzercontext'
-local server = require 'server'
-local generator = require('nelua.cgenerator')
-local json = require 'json'
+local generator = require 'nelua.cgenerator'
 local inspect = require 'nelua.thirdparty.inspect'
+local spairs = require 'nelua.utils.iterators'.spairs
+local server = require 'server'
+local json = require 'json'
 local parseerror = require 'parseerror'
 
 local astcache = {}
@@ -204,15 +205,59 @@ local function code_completion(reqid, params)
   local content = codecache[uri]
   local textpos = params.position
   local pos = utils.linecol2pos(content, textpos.line, textpos.character)
-  content = content:sub(1, pos-1):gsub('%a%w*$', '')..'--[[]]'..content:sub(pos):gsub('^%a%w*', '')
+  -- some hack for get ast node
+  local before = content:sub(1, pos-1):gsub('%a%w*$', '')
+  local after = content:sub(pos):gsub('^%a%w*', '')
+  local kind = "normal"
+  -- fake function call
+  if before:match('[.]$') then
+    before = before:sub(1, -2)..'()'
+    kind = "field"
+  elseif before:match(':$') then
+    before = before:sub(1, -2)..'()'
+    kind = "meta"
+  end
+  content = before..' '..after
 
   local ast = analyze_and_find_loc(params.textDocument.uri, textpos, content)
   local list = {}
   if ast then
-    local symcache = {}
-    gen_completion_list(ast.scope, symcache)
-    for k, v in pairs(symcache) do
-      table.insert(list, {label = k, detail = v})
+    local node = ast.node
+    if kind == "field" or kind == "meta" then
+      if node.is_call then
+        local attr = node.attr
+        local xtype = attr.type
+        local is_instance = false
+        if not xtype then
+          attr = node[2].attr
+          xtype = attr.type
+          is_instance = true
+        end
+        if xtype then
+          if is_instance then
+            for k, v in pairs(xtype.metafields) do
+              if kind == "meta" and v.metafuncselftype ~= nil then
+                table.insert(list, {label = k, detail = tostring(v)})
+              end
+            end
+            if kind == "field" then
+              for k, v in spairs(xtype.fields) do
+                table.insert(list, {label = k, detail = tostring(v.type)})
+              end
+            end
+          elseif kind == "field" then
+            for k, v in pairs(xtype.metafields) do
+              table.insert(list, {label = k, detail = tostring(v)})
+            end
+          end
+        end
+      end
+    elseif kind == "normal" then
+      local symcache = {}
+      gen_completion_list(ast.scope, symcache)
+      for k, v in pairs(symcache) do
+        table.insert(list, {label = k, detail = v})
+      end
     end
   end
   server.send_response(reqid, list)
@@ -227,7 +272,7 @@ server.capabilities = {
   hoverProvider = true,
   publishDiagnostics = true,
   completionProvider = {
-    triggerCharacters = { "." },
+    triggerCharacters = { ".", ":" },
   }
 }
 server.methods = {
