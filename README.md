@@ -3,7 +3,8 @@ Nelua LSP
 
 Features:
 * Diagnostics
-* Hover document
+* Hover
+* Code completion
 
 ## Usage
 
