@@ -204,10 +204,10 @@ local function code_completion(reqid, params)
   local uri = params.textDocument.uri
   local content = codecache[uri]
   local textpos = params.position
-  local pos = utils.linecol2pos(content, textpos.line, textpos.character)
+  local pos = utils.linecol2pos(content..'\n', textpos.line, textpos.character)
   -- some hack for get ast node
   local before = content:sub(1, pos-1):gsub('%a%w*$', '')
-  local after = content:sub(pos):gsub('^%a%w*', '')
+  local after = content:sub(pos):gsub('^[.:]?%a%w*', '')
   local kind = "normal"
   -- fake function call
   if before:match('[.]$') then
@@ -217,7 +217,7 @@ local function code_completion(reqid, params)
     before = before:sub(1, -2)..'()'
     kind = "meta"
   end
-  content = before..'--[[]]'..after
+  content = before..' '..after..'\n'
 
   local ast = analyze_and_find_loc(params.textDocument.uri, textpos, content)
   local list = {}
