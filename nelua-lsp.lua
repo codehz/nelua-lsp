@@ -46,8 +46,10 @@ local function analyze_ast(input, infile, uri, skip)
     ast = aster.parse(input, infile)
     local context = AnalyzerContext(analyzer.visitors, ast, generator)
     except.try(function()
-      local dir = infile:match('(.+)'..utils.dirsep)
-      lfs.chdir(dir)
+      if not server.root_path then
+        local dir = infile:match('(.+)'..utils.dirsep)
+        lfs.chdir(dir)
+      end
       for k, v in pairs(typedefs.primtypes) do
         if v.metafields then
           v.metafields = {}

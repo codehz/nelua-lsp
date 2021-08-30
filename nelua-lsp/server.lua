@@ -10,7 +10,9 @@ local server = {
   -- List of callbacks for each method.
   methods = {},
   -- Table of capabilities supported by this language server.
-  capabilities = {}
+  capabilities = {},
+  -- Has root path
+  root_path = nil,
 }
 
 -- Some LSP constants
@@ -105,6 +107,7 @@ function server.listen(stdin, stdout)
       -- send back the supported capabilities
       if req.params.rootPath then
         lfs.chdir(req.params.rootPath)
+        server.root_path = req.params.rootPath
       end
       server.send_response(req.id, {capabilities=server.capabilities, serverInfo={name="Nelua LSP Server"}})
     elseif req.method == 'initialized' then
