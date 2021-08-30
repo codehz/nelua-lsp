@@ -22,6 +22,7 @@ local fs = require 'nelua.utils.fs'
 local sstream = require 'nelua.utils.sstream'
 local analyzer = require 'nelua.analyzer'
 local aster = require 'nelua.aster'
+local typedefs = require 'nelua.typedefs'
 local AnalyzerContext = require 'nelua.analyzercontext'
 local generator = require 'nelua.cgenerator'
 local inspect = require 'nelua.thirdparty.inspect'
@@ -48,6 +49,11 @@ local function analyze_ast(input, infile, uri, skip)
     except.try(function()
       local dir = infile:match('(.+)'..utils.dirsep)
       lfs.chdir(dir)
+      for k, v in pairs(typedefs.primtypes) do
+        if v.metafields then
+          v.metafields = {}
+        end
+      end
       context = analyzer.analyze(context)
     end, function(e)
       -- todo
