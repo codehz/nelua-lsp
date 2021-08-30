@@ -110,7 +110,7 @@ local function analyze_and_find_loc(uri, textpos, content)
   local nodes = utils.find_nodes_by_pos(ast, pos)
   local lastnode = nodes[#nodes]
   if not lastnode then return end
-  local loc = {node=lastnode}
+  local loc = {node=lastnode, nodes=nodes}
   if lastnode.attr._symbol then
     loc.symbol = lastnode.attr
   end
@@ -122,7 +122,7 @@ local function analyze_and_find_loc(uri, textpos, content)
       break
     end
   end
-  return loc
+  return loc, content
 end
 
 local function dump_type_info(type, ss, opts)
@@ -187,6 +187,36 @@ local function hover_method(reqid, params)
     server.send_response(reqid, {contents = {kind = 'markdown', value = value}})
   else
     server.send_response(reqid, {contents = ''})
+  end
+end
+
+-- Get hover information
+local function definition_method(reqid, params)
+  local loc, content = analyze_and_find_loc(params.textDocument.uri, params.position)
+  if loc and loc.node and loc.symbol and loc.symbol.node then
+    local snode = loc.node
+    local srange = utils.posrange2textrange(content, snode.pos, snode.endpos)
+    local tnode = loc.symbol.node
+    local trange = utils.posrange2textrange(content, tnode.pos, tnode.endpos)
+    local pnodes = utils.find_parent_nodes(loc.nodes[1], tnode)
+    local prange = trange
+    if #pnodes then
+      for _, pnode in ipairs(pnodes) do
+        if pnode.pos ~= nil then
+          prange = utils.posrange2textrange(content, pnode.pos, pnode.endpos)
+          break
+        end
+      end
+    end
+    local uri = utils.path2uri(tnode.src.name)
+    server.send_response(reqid, {{
+      originSelectionRange = srange,
+      targetUri = uri,
+      targetRange = prange,
+      targetSelectionRange = trange,
+    }})
+  else
+    server.send_response(reqid, {})
   end
 end
 
@@ -295,10 +325,12 @@ server.capabilities = {
   publishDiagnostics = true,
   completionProvider = {
     triggerCharacters = { ".", ":" },
-  }
+  },
+  definitionProvider = true
 }
 server.methods = {
   ['textDocument/hover'] = hover_method,
+  ['textDocument/definition'] = definition_method,
   ['textDocument/didOpen'] = sync_open,
   ['textDocument/didChange'] = sync_change,
   ['textDocument/didClose'] = sync_close,

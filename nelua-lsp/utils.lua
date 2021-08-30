@@ -11,15 +11,27 @@ function decodeURI(s)
   return string.gsub(s, '%%(%x%x)', function(h) return string.char(tonumber(h, 16)) end)
 end
 
+function encodeURI(s)
+  s = string.gsub(s, "([^%w%.%- ])", function(c) return string.format("%%%02X", string.byte(c)) end)
+  return string.gsub(s, " ", "+")
+end
+
 -- Convert a LSP uri to an usable system path.
 function utils.uri2path(uri)
   local file = uri:match('file://(.*)')
   file = decodeURI(file)
   if utils.is_windows then
-    file = string.sub(string.gsub(file, '/', '\\'), 2)
+    file = string.sub(file:gsub('/', '\\'), 2)
   end
   file = fs.normpath(file)
   return file
+end
+
+function utils.path2uri(path)
+  if utils.is_windows then
+    path = '/'..path:gsub('\\', '/')
+  end
+  return 'file://'..path
 end
 
 -- Get content position from a line number and column number.
@@ -51,6 +63,21 @@ function utils.posrange2textrange(content, startpos, endpos)
           ['end']=utils.pos2textpos(content, endpos)}
 end
 
+local function find_parent_nodes(node, target, foundnodes)
+  if type(node) ~= 'table' then return end
+  for i=1,node.nargs or #node do
+    local curr = node[i]
+    if curr == target then
+      table.insert(foundnodes, node)
+      return true
+    end
+    if find_parent_nodes(curr, target, foundnodes) then
+      table.insert(foundnodes, node)
+      return true
+    end
+  end
+end
+
 local function find_nodes_by_pos(node, pos, foundnodes)
   if type(node) ~= 'table' then return end
   if node._astnode and
@@ -61,6 +88,13 @@ local function find_nodes_by_pos(node, pos, foundnodes)
   for i=1,node.nargs or #node do
     find_nodes_by_pos(node[i], pos, foundnodes)
   end
+end
+
+-- Find node's parent chain
+function utils.find_parent_nodes(node, target)
+  local foundnodes = {}
+  find_parent_nodes(node, target, foundnodes)
+  return foundnodes
 end
 
 -- Find all nodes that contains the position.
