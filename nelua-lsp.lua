@@ -1,6 +1,20 @@
-local utils = require 'utils'
 local lfs = require 'lfs'
 local console  = require 'nelua.utils.console'
+local except = require 'nelua.utils.except'
+local fs = require 'nelua.utils.fs'
+local sstream = require 'nelua.utils.sstream'
+local analyzer = require 'nelua.analyzer'
+local aster = require 'nelua.aster'
+local typedefs = require 'nelua.typedefs'
+local AnalyzerContext = require 'nelua.analyzercontext'
+local generator = require 'nelua.cgenerator'
+local inspect = require 'nelua.thirdparty.inspect'
+local spairs = require 'nelua.utils.iterators'.spairs
+
+local server = require 'nelua-lsp.server'
+local json = require 'nelua-lsp.json'
+local parseerror = require 'nelua-lsp.parseerror'
+local utils = require 'nelua-lsp.utils'
 
 local stdout
 do
@@ -15,21 +29,6 @@ do
   _G.print = console.debug
   _G.printf = console.debugf
 end
-
--- Required modules
-local except = require 'nelua.utils.except'
-local fs = require 'nelua.utils.fs'
-local sstream = require 'nelua.utils.sstream'
-local analyzer = require 'nelua.analyzer'
-local aster = require 'nelua.aster'
-local typedefs = require 'nelua.typedefs'
-local AnalyzerContext = require 'nelua.analyzercontext'
-local generator = require 'nelua.cgenerator'
-local inspect = require 'nelua.thirdparty.inspect'
-local spairs = require 'nelua.utils.iterators'.spairs
-local server = require 'server'
-local json = require 'json'
-local parseerror = require 'parseerror'
 
 local astcache = {}
 local codecache = {}

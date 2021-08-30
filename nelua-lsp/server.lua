@@ -1,8 +1,8 @@
 local lfs = require 'lfs'
-local json = require 'json'
 local console = require 'nelua.utils.console'
 local inspect = require 'nelua.thirdparty.inspect'
-local utils = require 'utils'
+local json = require 'nelua-lsp.json'
+local utils = require 'nelua-lsp.utils'
 
 local lenfmt = 'Content-Length: %d\r\n\r\n'
 
