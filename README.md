@@ -5,6 +5,7 @@ Features:
 * Diagnostics
 * Hover
 * Code completion
+* Go to definition
 
 ## Usage
 
