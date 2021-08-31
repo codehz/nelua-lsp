@@ -105,7 +105,7 @@ local function analyze_and_find_loc(uri, textpos, content)
   local ast = content and fetch_document(uri, content, true) or astcache[uri] or fetch_document(uri)
   if not ast then return end
   local content = content or codecache[uri]
-  local pos = utils.linecol2pos(content, textpos.line, textpos.character)
+  local pos = type(textpos) == 'number' and textpos or utils.linecol2pos(content, textpos.line, textpos.character)
   if not ast then return end
   local nodes = utils.find_nodes_by_pos(ast, pos)
   local lastnode = nodes[#nodes]
@@ -284,9 +284,9 @@ local function code_completion(reqid, params)
     before = before:sub(1, -2)..'()'
     kind = "meta"
   end
-  content = before..' '..after..'\n'
+  content = before..after
 
-  local ast = analyze_and_find_loc(params.textDocument.uri, textpos, content)
+  local ast = analyze_and_find_loc(params.textDocument.uri, #before, content)
   local list = {}
   if ast then
     local node = ast.node
