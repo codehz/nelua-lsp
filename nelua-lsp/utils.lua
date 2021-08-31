@@ -63,6 +63,10 @@ function utils.posrange2textrange(content, startpos, endpos)
           ['end']=utils.pos2textpos(content, endpos)}
 end
 
+function utils.node2textrange(node)
+  return utils.posrange2textrange(node.src.content, node.pos, node.endpos)
+end
+
 local function find_parent_nodes(node, target, foundnodes)
   if type(node) ~= 'table' then return end
   for i=1,node.nargs or #node do

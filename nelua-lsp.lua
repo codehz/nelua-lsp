@@ -191,27 +191,39 @@ local function hover_method(reqid, params)
   end
 end
 
-local function get_definitioin_symbol(root, snode, tnode)
-  if not tnode then return nil end
-  local srange = utils.posrange2textrange(snode.src.content, snode.pos, snode.endpos)
-  local trange = utils.posrange2textrange(tnode.src.content, tnode.pos, tnode.endpos)
-  local pnodes = utils.find_parent_nodes(root, tnode)
+local function get_node_ranges(root, tnode, pnode)
+  local trange = utils.node2textrange(tnode)
   local prange = trange
-  if #pnodes then
-    for _, pnode in ipairs(pnodes) do
-      if pnode.pos ~= nil then
-        prange = utils.posrange2textrange(tnode.src.content, pnode.pos, pnode.endpos)
-        break
+  if pnode then
+    prange = utils.node2textrange(pnode)
+  else
+    local pnodes = utils.find_parent_nodes(root, tnode)
+    if #pnodes then
+      for _, pnode in ipairs(pnodes) do
+        if pnode.pos ~= nil then
+          prange = utils.node2textrange(pnode)
+          break
+        end
       end
     end
   end
   local uri = utils.path2uri(tnode.src.name)
-  -- utils.dump_table(tnode.src)
+  return {
+    uri = uri,
+    range = prange,
+    selectionRange = trange,
+  }
+end
+
+local function get_definitioin_symbol(root, snode, tnode)
+  if not tnode then return nil end
+  local srange = utils.node2textrange(snode)
+  local tranges = get_node_ranges(root, tnode)
   return {
     originSelectionRange = srange,
-    targetUri = uri,
-    targetRange = prange,
-    targetSelectionRange = trange,
+    targetUri = tranges.uri,
+    targetRange = tranges.range,
+    targetSelectionRange = tranges.selectionRange,
   }
 end
 
@@ -237,6 +249,92 @@ local function definition_method(reqid, params)
   else
     print(node.tag)
   end
+  server.send_response(reqid, list)
+end
+
+local function dump_scope_symbols(ast)
+  local list = {}
+  for _, child in ipairs(ast.scope.children) do
+    local node = child.node
+    local item = nil
+    local xnode = node
+    if node.is_FuncDef then
+      local ranges = get_node_ranges(ast, node[2], node)
+      xnode = node[6]
+      item = {
+        name = node[2].attr.name,
+        detail = tostring(node.attr.type),
+        kind = 12,
+        range = ranges.range,
+        selectionRange = ranges.selectionRange,
+      }
+    end
+    if item then
+      item.children = dump_scope_symbols(xnode)
+      table.insert(list, item)
+    end
+  end
+  for name, symbol in spairs(ast.scope.symbols) do
+    if symbol.type.is_function then
+      goto continue
+    end
+    local node = symbol.node
+    local ranges = get_node_ranges(ast, node)
+    local children = {}
+    local kind = 13 -- variable
+    local detail = tostring(symbol.type)
+    if node.is_IdDecl then
+      local value = node.attr.value
+      if value then
+        local vnode = value.node
+        if vnode.is_RecordType then
+          kind = 23
+          detail = "record"
+          for _, field in ipairs(vnode) do
+            local range = utils.node2textrange(field)
+            table.insert(children, {
+              name = tostring(field[1]),
+              detail = tostring(field[2].attr.name),
+              kind = 8,
+              range = range,
+              selectionRange = range,
+            })
+          end
+        elseif vnode.is_EnumType then
+          kind = 10
+          detail = "enum"
+          if vnode[1] then
+            detail = string.format("enum(%s)", vnode[1].attr.name)
+          end
+          for _, field in ipairs(vnode[2]) do
+            local range = utils.node2textrange(field)
+            table.insert(children, {
+              name = tostring(field[1]),
+              detail = tostring(field[2] and field[2].attr and field[2].attr.value or ''),
+              kind = 8,
+              range = range,
+              selectionRange = range,
+            })
+          end
+        end
+      end
+    end
+    table.insert(list, {
+      name = name,
+      detail = detail,
+      kind = kind,
+      range = ranges.range,
+      selectionRange = ranges.selectionRange,
+      children = children,
+    })
+    ::continue::
+  end
+  return list
+end
+
+local function document_symbol(reqid, params)
+  local ast = fetch_document(params.textDocument.uri)
+  local list = ast and dump_scope_symbols(ast) or {}
   server.send_response(reqid, list)
 end
 
@@ -346,11 +444,13 @@ server.capabilities = {
   completionProvider = {
     triggerCharacters = { ".", ":" },
   },
-  definitionProvider = true
+  definitionProvider = true,
+  documentSymbolProvider = true,
 }
 server.methods = {
   ['textDocument/hover'] = hover_method,
   ['textDocument/definition'] = definition_method,
+  ['textDocument/documentSymbol'] = document_symbol,
   ['textDocument/didOpen'] = sync_open,
   ['textDocument/didChange'] = sync_change,
   ['textDocument/didClose'] = sync_close,
