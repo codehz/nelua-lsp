@@ -276,7 +276,7 @@ local function dump_scope_symbols(ast)
     end
   end
   for name, symbol in spairs(ast.scope.symbols) do
-    if symbol.type.is_function or symbol.type.is_polyfunction then
+    if not symbol.type or symbol.type.is_function or symbol.type.is_polyfunction then
       goto continue
     end
     local node = symbol.node

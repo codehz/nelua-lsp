@@ -29,7 +29,7 @@ return function(content)
         message = res[5],
         length = 1,
       }
-    else
+    elseif curr then
       local matched = line:match("^ *([~^]+) *$")
       if matched then
         curr.message = curr.message:match('(.+)\n')
