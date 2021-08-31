@@ -253,6 +253,7 @@ local function definition_method(reqid, params)
 end
 
 local function dump_scope_symbols(ast)
+  if not ast.scope then return {} end
   local list = {}
   for _, child in ipairs(ast.scope.children) do
     local node = child.node
@@ -275,7 +276,7 @@ local function dump_scope_symbols(ast)
     end
   end
   for name, symbol in spairs(ast.scope.symbols) do
-    if symbol.type.is_function then
+    if symbol.type.is_function or symbol.type.is_polyfunction then
       goto continue
     end
     local node = symbol.node
@@ -285,7 +286,7 @@ local function dump_scope_symbols(ast)
     local detail = tostring(symbol.type)
     if node.is_IdDecl then
       local value = node.attr.value
-      if value then
+      if value and value.node then
         local vnode = value.node
         if vnode.is_RecordType then
           kind = 23

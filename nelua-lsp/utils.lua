@@ -51,16 +51,35 @@ function utils.linecol2pos(content, lineno, colno)
   return pos + 1 -- convert to one-based
 end
 
+local function textpos2string(pos)
+  return string.format('%d:%d', pos.line+1, pos.character+1)
+end
+
+local function textpos(lineno, colno)
+  if colno <= 1 then colno = 1 end
+  return setmetatable({line=lineno-1, character=colno-1}, {__tostring=textpos2string})
+end
+
 -- Convert content position into a table to send back in LSP API.
 function utils.pos2textpos(content, pos)
   local lineno, colno = lpegrex.calcline(content, pos)
-  return {line=lineno-1, character=colno-1} -- convert to zero-based
+  return textpos(lineno, colno) -- convert to zero-based
+end
+
+local function textrange2string(range)
+  return string.format('[%s-%s]', range['start'], range['end'])
+end
+
+local function textrange(a, b)
+  return setmetatable({["start"]=a, ["end"]=b}, {__tostring=textrange2string})
 end
 
 -- Convert a content position range to a table to send back in LSP API.
 function utils.posrange2textrange(content, startpos, endpos)
-  return {['start']=utils.pos2textpos(content, startpos),
-          ['end']=utils.pos2textpos(content, endpos)}
+  return textrange(
+    utils.pos2textpos(content, startpos),
+    utils.pos2textpos(content, endpos)
+  )
 end
 
 function utils.node2textrange(node)
