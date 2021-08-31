@@ -122,10 +122,11 @@ local function analyze_and_find_loc(uri, textpos, content)
       break
     end
   end
-  return loc, content
+  return loc
 end
 
 local function dump_type_info(type, ss, opts)
+  opts = opts or {}
   if not opts.no_header then
     ss:addmany('**type** `', type.nickname or type.name, '`\n')
   end
@@ -190,34 +191,53 @@ local function hover_method(reqid, params)
   end
 end
 
--- Get hover information
-local function definition_method(reqid, params)
-  local loc, content = analyze_and_find_loc(params.textDocument.uri, params.position)
-  if loc and loc.node and loc.symbol and loc.symbol.node then
-    local snode = loc.node
-    local srange = utils.posrange2textrange(content, snode.pos, snode.endpos)
-    local tnode = loc.symbol.node
-    local trange = utils.posrange2textrange(content, tnode.pos, tnode.endpos)
-    local pnodes = utils.find_parent_nodes(loc.nodes[1], tnode)
-    local prange = trange
-    if #pnodes then
-      for _, pnode in ipairs(pnodes) do
-        if pnode.pos ~= nil then
-          prange = utils.posrange2textrange(content, pnode.pos, pnode.endpos)
-          break
-        end
+local function get_definitioin_symbol(root, snode, tnode)
+  if not tnode then return nil end
+  local srange = utils.posrange2textrange(snode.src.content, snode.pos, snode.endpos)
+  local trange = utils.posrange2textrange(tnode.src.content, tnode.pos, tnode.endpos)
+  local pnodes = utils.find_parent_nodes(root, tnode)
+  local prange = trange
+  if #pnodes then
+    for _, pnode in ipairs(pnodes) do
+      if pnode.pos ~= nil then
+        prange = utils.posrange2textrange(tnode.src.content, pnode.pos, pnode.endpos)
+        break
       end
     end
-    local uri = utils.path2uri(tnode.src.name)
-    server.send_response(reqid, {{
-      originSelectionRange = srange,
-      targetUri = uri,
-      targetRange = prange,
-      targetSelectionRange = trange,
-    }})
-  else
-    server.send_response(reqid, {})
   end
+  local uri = utils.path2uri(tnode.src.name)
+  -- utils.dump_table(tnode.src)
+  return {
+    originSelectionRange = srange,
+    targetUri = uri,
+    targetRange = prange,
+    targetSelectionRange = trange,
+  }
+end
+
+-- Get hover information
+local function definition_method(reqid, params)
+  local loc = analyze_and_find_loc(params.textDocument.uri, params.position)
+  if not loc then
+    server.send_response(reqid, {})
+    return
+  end
+  local rootnode = loc.nodes[1]
+  local node = loc.node
+  local list = {}
+  if node.is_Id then
+    table.insert(list, get_definitioin_symbol(rootnode, node, loc.symbol.node))
+  elseif node.is_call then
+    table.insert(list, get_definitioin_symbol(rootnode, node, node.attr.calleesym.node))
+  elseif node.is_DotIndex then
+    local sym = loc.symbol or node[2].attr
+    if sym then
+      table.insert(list, get_definitioin_symbol(rootnode, node, sym.node))
+    end
+  else
+    print(node.tag)
+  end
+  server.send_response(reqid, list)
 end
 
 local function sync_open(reqid, params)

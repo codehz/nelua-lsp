@@ -104,10 +104,20 @@ function utils.find_nodes_by_pos(node, pos)
   return foundnodes
 end
 
-function utils.dump_table(table)
+function utils.dump_table(table, opts)
+  opts = opts or {}
   if not table then
     console.debug '(nil)'
     return
+  end
+  if type(table) ~= 'table' then
+    console.debug('('..type(table)..')')
+    return
+  end
+  if opts.meta then
+    for k, v in pairs(getmetatable(table)) do
+      console.debugf("#%s = %s", k, tostring(v))
+    end
   end
   for k, v in pairs(table) do
     console.debugf("%s = %s", k, tostring(v))
