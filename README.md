@@ -11,5 +11,5 @@ Features:
 
 launch command:
 ```
-nelua --script path/to/nelua-lsp.lua
+nelua -L path/to/nelua-lsp-folder/ --script path/to/nelua-lsp.lua
 ```
